@@ -50,25 +50,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   width:min(1100px,calc(100% - 30px));margin:0 auto;padding:18px 0 12px;justify-content:flex-end;
   backdrop-filter:blur(18px);
 }
+.project-status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;white-space:nowrap;cursor:pointer}
+.project-status input{width:18px;height:18px;margin:0;accent-color:var(--accent);cursor:pointer}
 .top-select{
   max-width:250px;border:1px solid var(--line);border-radius:12px;padding:9px 36px 9px 12px;
   background:rgba(28,25,23,.72);color:var(--text);
 }
 .stage{position:relative;z-index:1;width:min(1100px,calc(100% - 30px));margin:0 auto;padding:14px 0 44px}
-.overview{
-  display:flex;justify-content:flex-end;gap:18px;align-items:end;
-  margin:8px auto 18px;padding:0 80px;
-}
-.searchbox{
-  display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:14px;
-  width:min(410px,100%);background:rgba(24,21,19,.62);padding:0 12px;transition:.2s ease;
-}
-.searchbox:focus-within{border-color:rgba(49,194,168,.6);box-shadow:0 0 0 4px rgba(49,194,168,.08)}
-.searchbox svg{width:18px;color:var(--muted);flex:0 0 auto}
-.searchbox input{width:100%;border:0;outline:0;background:transparent;color:var(--text);padding:12px 0;font-size:14px}
-.searchbox input::placeholder{color:#887f78}
-.clear-search{display:none;border:0;background:transparent;color:var(--muted);font-size:18px;padding:4px}
-.clear-search.show{display:block}
 .deck-shell{position:relative;display:grid;grid-template-columns:58px minmax(0,1fr) 58px;gap:22px;align-items:center}
 .rail-button{
   width:54px;height:54px;border:1px solid var(--line);border-radius:50%;background:rgba(255,255,255,.055);
@@ -133,13 +121,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 }
 .toast.show{opacity:1;transform:translate(-50%,0)}
 @media(max-width:850px){
-  .overview{padding:0;grid-template-columns:1fr}.searchbox{width:100%}.deck-shell{grid-template-columns:1fr}.rail-button{display:none}
+  .deck-shell{grid-template-columns:1fr}.rail-button{display:none}
   .study-card{min-height:0}.mobile-nav{display:grid}
 }
 @media(max-width:560px){
   .topbar{position:relative;width:min(100% - 22px,1100px);padding-top:12px;gap:10px;flex-wrap:wrap}
-  .brand-subtitle{display:none}.top-select{order:3;max-width:none;width:100%}.stage{width:min(100% - 20px,1100px);padding-top:8px}
-  .overview{margin-top:2px;gap:12px}.project-heading{font-size:26px}.study-card{padding:22px 18px;border-radius:24px}
+  .project-status{order:2}.top-select{order:3;max-width:none;width:100%}.stage{width:min(100% - 20px,1100px);padding-top:8px}
+  .study-card{padding:22px 18px;border-radius:24px}
   .card-top{margin-bottom:20px}.meaning{margin-bottom:22px}.content-panel{padding:18px 16px;border-radius:18px}
   .thai-example{font-size:23px}.example-cn{font-size:15px}.token{padding:7px 9px}
 }
@@ -148,18 +136,14 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 </head>
 <body>
 <header class="topbar">
+  <label class="project-status">
+    <input id="projectDone" type="checkbox">
+    <span>项目已完成</span>
+  </label>
   <select class="top-select" id="projectSelect" aria-label="选择学习项目"></select>
 </header>
 
 <main class="stage">
-  <section class="overview">
-    <label class="searchbox" aria-label="搜索当前项目">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="searchInput" autocomplete="off" placeholder="搜索当前项目的泰语、中文或编号">
-      <button class="clear-search" id="clearSearch" type="button" aria-label="清空搜索">×</button>
-    </label>
-  </section>
-
   <section class="deck-shell">
     <button class="rail-button" id="prevButton" type="button" aria-label="上一个词">‹</button>
 
@@ -215,16 +199,25 @@ const STORAGE_PREFIX="thai_card_1000_v1";
 const $=selector=>document.querySelector(selector);
 const elements={
   projectSelect:$("#projectSelect"),
-  searchInput:$("#searchInput"),clearSearch:$("#clearSearch"),
+  projectDone:$("#projectDone"),
   studyCard:$("#studyCard"),cardContent:$("#cardContent"),emptyState:$("#emptyState"),cardCount:$("#cardCount"),thaiWord:$("#thaiWord"),speakWord:$("#speakWord"),
   meaning:$("#meaning"),thaiExample:$("#thaiExample"),exampleCn:$("#exampleCn"),literalTokens:$("#literalTokens"),
   prevButton:$("#prevButton"),nextButton:$("#nextButton"),mobilePrev:$("#mobilePrev"),mobileNext:$("#mobileNext"),toast:$("#toast")
 };
 
+function loadCompletedProjects(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}_completed`)||"[]");
+    return new Set(Array.isArray(saved)?saved.map(Number).filter(project=>project>=1&&project<=PROJECT_COUNT):[]);
+  }catch{return new Set()}
+}
+function saveCompletedProjects(){
+  localStorage.setItem(`${STORAGE_PREFIX}_completed`,JSON.stringify([...state.completed].sort((a,b)=>a-b)));
+}
 const state={
   project:Math.min(PROJECT_COUNT,Math.max(1,Number(localStorage.getItem(`${STORAGE_PREFIX}_project`))||1)),
   index:Math.max(0,Number(localStorage.getItem(`${STORAGE_PREFIX}_index`))||0),
-  query:""
+  completed:loadCompletedProjects()
 };
 
 function esc(value){
@@ -235,16 +228,11 @@ function projectRows(project=state.project){
   return DATA.slice(start,start+PROJECT_SIZE);
 }
 function activeRows(){
-  const rows=projectRows();
-  const query=state.query.trim().toLowerCase();
-  if(!query)return rows;
-  return rows.filter((item,index)=>[
-    index+1,item.no,item.orig_no,item.word,item.meaning,item.example,item.polished,item.literal
-  ].join(" ").toLowerCase().includes(query));
+  return projectRows();
 }
 function savePosition(){
   localStorage.setItem(`${STORAGE_PREFIX}_project`,String(state.project));
-  if(!state.query)localStorage.setItem(`${STORAGE_PREFIX}_index`,String(state.index));
+  localStorage.setItem(`${STORAGE_PREFIX}_index`,String(state.index));
 }
 function pad(value,size=3){return String(value).padStart(size,"0")}
 function showToast(message){
@@ -267,20 +255,16 @@ function literalMarkup(text){
   if(!matches.length)return `<div class="literal-fallback">${esc(source||"暂无逐词翻译")}</div>`;
   return matches.map(match=>`<button class="token" type="button" data-speak="${esc(match[1])}"><span class="token-th">${esc(match[1])}</span><span class="token-cn">${esc(match[2])}</span></button>`).join("");
 }
-function currentProjectRange(){
-  const start=(state.project-1)*PROJECT_SIZE+1;
-  const end=Math.min(state.project*PROJECT_SIZE,DATA.length);
-  return {start,end,total:end-start+1};
-}
 function populateProjects(){
   elements.projectSelect.innerHTML=Array.from({length:PROJECT_COUNT},(_,index)=>{
     const project=index+1,start=index*PROJECT_SIZE+1,end=Math.min((index+1)*PROJECT_SIZE,DATA.length);
-    return `<option value="${project}">项目 ${pad(project,2)} · ${start.toLocaleString()}–${end.toLocaleString()}</option>`;
+    const done=state.completed.has(project)?" ✓":"";
+    return `<option value="${project}">项目 ${pad(project,2)} · ${start.toLocaleString()}–${end.toLocaleString()}${done}</option>`;
   }).join("");
   elements.projectSelect.value=state.project;
 }
-function updateProjectHeader(rows){
-  elements.clearSearch.classList.toggle("show",Boolean(state.query));
+function updateProjectStatus(){
+  elements.projectDone.checked=state.completed.has(state.project);
 }
 function animateCard(direction){
   if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
@@ -293,7 +277,7 @@ function animateCard(direction){
 function render(direction=0){
   const rows=activeRows();
   state.index=Math.min(Math.max(0,state.index),Math.max(0,rows.length-1));
-  updateProjectHeader(rows);
+  updateProjectStatus();
   const empty=!rows.length;
   elements.cardContent.hidden=empty;elements.emptyState.hidden=!empty;
   elements.prevButton.disabled=empty;
@@ -305,7 +289,7 @@ function render(direction=0){
   const item=rows[state.index];
   const baseRows=projectRows();
   const projectIndex=baseRows.findIndex(row=>row.no===item.no)+1;
-  elements.cardCount.textContent=state.query?`结果 ${state.index+1} / ${rows.length}`:`${pad(projectIndex)} / ${baseRows.length}`;
+  elements.cardCount.textContent=`${pad(projectIndex)} / ${baseRows.length}`;
   elements.thaiWord.textContent=item.word||"—";
   elements.thaiWord.classList.toggle("compact",String(item.word||"").length>16);
   elements.meaning.textContent=item.meaning||"暂无释义";
@@ -330,13 +314,15 @@ function move(step){
 }
 
 elements.projectSelect.addEventListener("change",event=>{
-  state.project=Number(event.target.value);state.index=0;state.query="";elements.searchInput.value="";savePosition();render(1);
+  state.project=Number(event.target.value);state.index=0;savePosition();render(1);
 });
-elements.searchInput.addEventListener("input",event=>{
-  state.query=event.target.value;state.index=0;render();
-});
-elements.clearSearch.addEventListener("click",()=>{
-  state.query="";state.index=0;elements.searchInput.value="";elements.searchInput.focus();render();
+elements.projectDone.addEventListener("change",event=>{
+  if(event.target.checked)state.completed.add(state.project);
+  else state.completed.delete(state.project);
+  saveCompletedProjects();
+  populateProjects();
+  render();
+  showToast(event.target.checked?"项目已标记完成":"已取消项目完成标记");
 });
 elements.prevButton.addEventListener("click",()=>move(-1));
 elements.mobilePrev.addEventListener("click",()=>move(-1));
